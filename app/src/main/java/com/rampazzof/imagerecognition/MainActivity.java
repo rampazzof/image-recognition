@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Environment;
+import android.preference.PreferenceActivity;
 import android.provider.MediaStore;
 import android.provider.SyncStateContract;
 import android.support.v4.app.ActivityCompat;
@@ -19,24 +20,18 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 
-import com.android.volley.AuthFailureError;
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.VolleyLog;
-import com.android.volley.toolbox.StringRequest;
-import com.android.volley.toolbox.Volley;
+import com.rampazzof.imagerecognition.api.Caller;
 
-import org.json.JSONObject;
+import org.json.*;
+import com.loopj.android.http.*;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
+import java.net.*;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import cz.msebera.android.httpclient.Header;
 
 import static android.provider.AlarmClock.EXTRA_MESSAGE;
 import static android.provider.Telephony.Carriers.PASSWORD;
@@ -106,7 +101,12 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK ) {
             imageHolder = findViewById( R.id.capturedPhoto );
             imageHolder.setImageBitmap( BitmapFactory.decodeFile( mCurrentPhotoPath ) );
-            callApi( mCurrentPhotoPath );
+
+            try {
+                sendPostRequest();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -125,68 +125,34 @@ public class MainActivity extends AppCompatActivity {
         return image;
     }
 
-    private void callApi( String str ) {
+    public void sendPostRequest() throws MalformedURLException, IOException {
+
+        URL url = new URL("https://westcentralus.api.cognitive.microsoft.com/vision/v1.0/analyze" );
+        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         try {
-            JSONObject jsonBody = new JSONObject();
-            jsonBody.put("url", str);
-            final String requestBody = jsonBody.toString();
+            urlConnection.setRequestProperty( "Content-Type", "application/octet-stream" );
+            urlConnection.setRequestProperty("Ocp-Apim-Subscription-Key", "3ee10ebd611a41bdb4b9cbdbf877d4ef" );
 
-            RequestQueue queue = Volley.newRequestQueue(this);
+            urlConnection.setDoOutput(true);
+            DataOutputStream wr = new DataOutputStream(urlConnection.getOutputStream());
+            wr.writeBytes(Files.readAllBytes( new File( mCurrentPhotoPath ).toPath() ).toString());
+            wr.flush();
+            wr.close();
 
-            StringRequest postRequest = new StringRequest(
-                    Request.Method.POST,
-                    ENDPOINT,
-                    new Response.Listener<String>() {
-                        @Override
-                        public void onResponse(String response) {
-                            // response
-                            Log.d("Response", response);
-                        }
-                    },
-                    new Response.ErrorListener() {
-                        @Override
-                        public void onErrorResponse(VolleyError error) {
-                            // error
-                            Log.d("Error.Response", error.toString());
-                        }
-                    }
-            ) {
-                @Override
-                public String getBodyContentType() {
-                    return "application/json; charset=utf-8";
-                }
-
-                @Override
-                public Map<String, String> getHeaders() throws AuthFailureError {
-                    Map<String, String> headers = super.getHeaders();
-                    headers.put("Content-Type", "application/json");
-                    headers.put("Ocp-Apim-Subscription-Key", APIKEY);
-                    return headers;
-                }
-
-                @Override
-                protected Map<String, String> getParams() throws AuthFailureError {
-                    Map<String, String> params = super.getParams();
-                    params.put("visualFeatures", "Categories,Description,Color");
-                    params.put("language", "en");
-
-                    return params;
-                }
-
-                @Override
-                public byte[] getBody() throws AuthFailureError {
-                    try {
-                        return requestBody == null ? null : requestBody.getBytes("utf-8");
-                    } catch (UnsupportedEncodingException uee) {
-                        VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", requestBody, "utf-8");
-                        return null;
-                    }
-                }
-            };
-            queue.add(postRequest);
+            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+            streamToString( in );
+        } finally {
+            urlConnection.disconnect();
         }
-        catch ( Exception e ) {
-            e.printStackTrace();
+    }
+
+    private static String streamToString(InputStream is) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        BufferedReader rd = new BufferedReader(new InputStreamReader(is));
+        String line;
+        while ((line = rd.readLine()) != null) {
+            sb.append(line);
         }
+        return sb.toString();
     }
 }

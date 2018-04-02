@@ -27,5 +27,6 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
 
     implementation group: 'com.android.volley', name: 'volley', version: '1.1.0'
+    implementation 'com.loopj.android:android-async-http:1.4.9'
 
 }
