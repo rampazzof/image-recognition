@@ -3,7 +3,9 @@ package com.rampazzof.imagerecognition;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
@@ -13,9 +15,11 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.AppCompatImageHelper;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.rampazzof.imagerecognition.interfaces.OnTaskComplete;
 import com.rampazzof.imagerecognition.utils.IOUtility;
@@ -25,13 +29,12 @@ import java.net.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnTaskComplete {
 
-    static final int REQUEST_IMAGE_CAPTURE = 1;
+    private static final int REQUEST_IMAGE_CAPTURE = 1;
     private static final String ENDPOINT = "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0/describe";
     private static final String APIKEY = "3ee10ebd611a41bdb4b9cbdbf877d4ef";
 
-    private ImageView imageHolder;
     String mCurrentPhotoPath;
 
     @Override
@@ -39,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate( savedInstanceState );
         setContentView( R.layout.activity_main );
+        ImageView imageHolder = findViewById( R.id.capturedPhoto );
+        imageHolder.setVisibility( View.GONE );
+
 
     }
 
@@ -46,20 +52,26 @@ public class MainActivity extends AppCompatActivity {
 
         if( ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA ) != PackageManager.PERMISSION_GRANTED ) {
 
-            ActivityCompat.requestPermissions( this,
-                    new String[]{ Manifest.permission.CAMERA }, 1 );
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{ Manifest.permission.CAMERA },
+                    1 );
 
         }
         else if( ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE ) != PackageManager.PERMISSION_GRANTED ) {
 
-            ActivityCompat.requestPermissions( this,
-                    new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE }, 1 );
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE },
+                    1 );
 
         }
         else if( ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET ) != PackageManager.PERMISSION_GRANTED ) {
 
-            ActivityCompat.requestPermissions( this,
-                    new String[]{ Manifest.permission.INTERNET }, 1 );
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{ Manifest.permission.INTERNET },
+                    1 );
 
         }
         else {
@@ -69,13 +81,20 @@ public class MainActivity extends AppCompatActivity {
             if( takePictureIntent.resolveActivity( getPackageManager() ) != null ) {
 
                 File photo = null;
+
                 try {
+
                     photo = createImageFile();
+
                 }
                 catch ( IOException e ) {
+
                     Log.getStackTraceString( e );
+
                 }
+
                 if( photo != null ) {
+
                     Uri uriPhoto = FileProvider.getUriForFile(
                             this,
                             "com.rampazzof.imagerecognition.fileprovider",
@@ -88,15 +107,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK ) {
-            imageHolder = findViewById( R.id.capturedPhoto );
-            imageHolder.setImageBitmap( BitmapFactory.decodeFile( mCurrentPhotoPath ) );
+    public void onActivityResult( int requestCode, int resultCode, Intent data ) {
+
+        if ( requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK ) {
+
+            ImageView imageView = findViewById( R.id.capturedPhoto );
+            Bitmap bitmap = BitmapFactory.decodeFile( mCurrentPhotoPath );
+            Matrix matrix = new Matrix();
+            matrix.postRotate(90);
+            Bitmap rotated = Bitmap.createBitmap(
+                    bitmap,
+                    0,
+                    0,
+                    bitmap.getWidth(),
+                    bitmap.getHeight(),
+                    matrix,
+                    true );
+            imageView.setImageBitmap( rotated );
+            imageView.setVisibility( View.VISIBLE );
 
             try {
+
                 sendPostRequest();
+
             } catch (IOException e) {
+
                 e.printStackTrace();
+
             }
         }
     }
@@ -118,10 +155,10 @@ public class MainActivity extends AppCompatActivity {
 
     public void sendPostRequest() throws IOException {
 
-        new AsyncTask< Void, Void, String >() {
+        new AsyncTask< Void, Void, Void >() {
 
             @Override
-            protected String doInBackground(Void... voids) {
+            protected Void doInBackground( Void... voids ) {
 
                 HttpURLConnection urlConnection = null;
                 OutputStream outputStream = null;
@@ -153,14 +190,18 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 MainActivity.this.onTaskCompleted( result );
-                return "Executed";
+                return null;
             }
         }.execute();
 
     }
 
+    @Override
     public void onTaskCompleted( String string ) {
-        Log.d("Leso", string == null ? "caneeeeeeeeeeeeee" : string );
+
+        TextView textView = findViewById( R.id.resultText );
+        textView.setText( string != null ? string : "No result" );
+
     }
 
 }
