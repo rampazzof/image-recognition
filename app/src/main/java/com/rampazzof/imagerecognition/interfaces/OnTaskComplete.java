@@ -1,4 +1,7 @@
 package com.rampazzof.imagerecognition.interfaces;
 
-public class OnTaskComplete {
+import java.io.InputStream;
+
+public interface OnTaskComplete {
+    void onTaskCompleted( String string );
 }

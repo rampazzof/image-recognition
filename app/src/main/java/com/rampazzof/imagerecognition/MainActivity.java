@@ -3,13 +3,11 @@ package com.rampazzof.imagerecognition;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Environment;
-import android.preference.PreferenceActivity;
 import android.provider.MediaStore;
-import android.provider.SyncStateContract;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
@@ -17,38 +15,31 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.ImageView;
 
-import com.rampazzof.imagerecognition.api.Caller;
-
-import org.json.*;
-import com.loopj.android.http.*;
+import com.rampazzof.imagerecognition.interfaces.OnTaskComplete;
+import com.rampazzof.imagerecognition.utils.IOUtility;
 
 import java.io.*;
 import java.net.*;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
-
-import cz.msebera.android.httpclient.Header;
-
-import static android.provider.AlarmClock.EXTRA_MESSAGE;
-import static android.provider.Telephony.Carriers.PASSWORD;
 
 public class MainActivity extends AppCompatActivity {
 
     static final int REQUEST_IMAGE_CAPTURE = 1;
-    private static final String ENDPOINT = "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0";
-    private static final String APIKEY = "";
+    private static final String ENDPOINT = "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0/describe";
+    private static final String APIKEY = "3ee10ebd611a41bdb4b9cbdbf877d4ef";
 
     private ImageView imageHolder;
     String mCurrentPhotoPath;
 
     @Override
     protected void onCreate( Bundle savedInstanceState ) {
+
         super.onCreate( savedInstanceState );
         setContentView( R.layout.activity_main );
+
     }
 
     public void takePhoto( View view ) {
@@ -125,34 +116,51 @@ public class MainActivity extends AppCompatActivity {
         return image;
     }
 
-    public void sendPostRequest() throws MalformedURLException, IOException {
+    public void sendPostRequest() throws IOException {
 
-        URL url = new URL("https://westcentralus.api.cognitive.microsoft.com/vision/v1.0/analyze" );
-        HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        try {
-            urlConnection.setRequestProperty( "Content-Type", "application/octet-stream" );
-            urlConnection.setRequestProperty("Ocp-Apim-Subscription-Key", "3ee10ebd611a41bdb4b9cbdbf877d4ef" );
+        new AsyncTask< Void, Void, String >() {
 
-            urlConnection.setDoOutput(true);
-            DataOutputStream wr = new DataOutputStream(urlConnection.getOutputStream());
-            wr.writeBytes(Files.readAllBytes( new File( mCurrentPhotoPath ).toPath() ).toString());
-            wr.flush();
-            wr.close();
+            @Override
+            protected String doInBackground(Void... voids) {
 
-            InputStream in = new BufferedInputStream(urlConnection.getInputStream());
-            streamToString( in );
-        } finally {
-            urlConnection.disconnect();
-        }
+                HttpURLConnection urlConnection = null;
+                OutputStream outputStream = null;
+                InputStream inputStream = null;
+                String result = null;
+
+                try {
+
+                    URL url = new URL( ENDPOINT );
+                    urlConnection = (HttpURLConnection) url.openConnection();
+                    urlConnection.setRequestProperty( "Content-Type", "application/octet-stream" );
+                    urlConnection.setRequestProperty( "Ocp-Apim-Subscription-Key", APIKEY );
+
+                    urlConnection.setDoOutput( true );
+                    outputStream = new BufferedOutputStream( urlConnection.getOutputStream() );
+                    IOUtility.fileToByteArray( outputStream, mCurrentPhotoPath );
+
+                    inputStream = new BufferedInputStream( urlConnection.getInputStream() );
+                    result = IOUtility.streamToString( inputStream );
+
+                }
+                catch( Exception e ) {
+                    e.printStackTrace();
+                }
+                finally {
+                    if( inputStream != null ) { try { inputStream.close(); } catch (Exception e ){} };
+                    if( outputStream != null ) { try { outputStream.close(); } catch (Exception e ){} };
+                    urlConnection.disconnect();
+                }
+
+                MainActivity.this.onTaskCompleted( result );
+                return "Executed";
+            }
+        }.execute();
+
     }
 
-    private static String streamToString(InputStream is) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        BufferedReader rd = new BufferedReader(new InputStreamReader(is));
-        String line;
-        while ((line = rd.readLine()) != null) {
-            sb.append(line);
-        }
-        return sb.toString();
+    public void onTaskCompleted( String string ) {
+        Log.d("Leso", string == null ? "caneeeeeeeeeeeeee" : string );
     }
+
 }
