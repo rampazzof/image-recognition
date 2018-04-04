@@ -1,5 +1,7 @@
 package com.rampazzof.imagerecognition.utils;
 
+import android.util.Log;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -38,9 +40,12 @@ public class IOUtility {
 
         try( InputStream inputStream = new FileInputStream( file ) ) {
 
+            if ( ( float ) file.length() / ( 1024 * 1024 ) > 4 ) {
+                Log.d("Error:", "Maggiore di 4 MB" );
+            }
+
             getBytes = new byte[ ( int ) file.length() ];
             inputStream.read( getBytes );
-            inputStream.close();
 
         } catch( FileNotFoundException e ) {
             e.printStackTrace();

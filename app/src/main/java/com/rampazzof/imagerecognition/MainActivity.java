@@ -45,7 +45,6 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
         ImageView imageHolder = findViewById( R.id.capturedPhoto );
         imageHolder.setVisibility( View.GONE );
 
-
     }
 
     public void takePhoto( View view ) {
