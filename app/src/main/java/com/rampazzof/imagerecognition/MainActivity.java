@@ -24,6 +24,10 @@ import android.widget.TextView;
 import com.rampazzof.imagerecognition.interfaces.OnTaskComplete;
 import com.rampazzof.imagerecognition.utils.IOUtility;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
@@ -35,6 +39,7 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
     private static final String ENDPOINT = "https://westcentralus.api.cognitive.microsoft.com/vision/v1.0/describe";
     private static final String APIKEY = "3ee10ebd611a41bdb4b9cbdbf877d4ef";
 
+    TextView textView;
     String mCurrentPhotoPath;
 
     @Override
@@ -154,6 +159,9 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
 
     public void sendPostRequest() throws IOException {
 
+        textView = findViewById( R.id.resultText );
+        textView.setText( "Loading..." );
+
         new AsyncTask< Void, Void, Void >() {
 
             @Override
@@ -163,11 +171,14 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
                 OutputStream outputStream = null;
                 InputStream inputStream = null;
                 String result = null;
+                int responseCode = 0;
 
                 try {
 
                     URL url = new URL( ENDPOINT );
-                    urlConnection = (HttpURLConnection) url.openConnection();
+                    urlConnection = ( HttpURLConnection ) url.openConnection();
+                    urlConnection.setConnectTimeout( 60000 );
+                    urlConnection.setReadTimeout( 60000 );
                     urlConnection.setRequestProperty( "Content-Type", "application/octet-stream" );
                     urlConnection.setRequestProperty( "Ocp-Apim-Subscription-Key", APIKEY );
 
@@ -177,7 +188,18 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
 
                     inputStream = new BufferedInputStream( urlConnection.getInputStream() );
                     result = IOUtility.streamToString( inputStream );
+                    responseCode = urlConnection.getResponseCode();
+                    MainActivity.this.onTaskCompleted( responseCode, result );
 
+                }
+                catch ( IOException e ) {
+                    Log.d( "Error","Error connecting do the server" );
+                    try {
+                        MainActivity.this.onTaskCompleted( urlConnection.getResponseCode(), urlConnection.getResponseMessage() );
+                    }
+                    catch ( IOException ioe ) {
+                        e.printStackTrace();
+                    }
                 }
                 catch( Exception e ) {
                     e.printStackTrace();
@@ -187,8 +209,6 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
                     if( outputStream != null ) { try { outputStream.close(); } catch (Exception e ){} };
                     urlConnection.disconnect();
                 }
-
-                MainActivity.this.onTaskCompleted( result );
                 return null;
             }
         }.execute();
@@ -196,10 +216,42 @@ public class MainActivity extends AppCompatActivity implements OnTaskComplete {
     }
 
     @Override
-    public void onTaskCompleted( String string ) {
+    public void onTaskCompleted( int responseCode, String string ) {
 
-        TextView textView = findViewById( R.id.resultText );
-        textView.setText( string != null ? string : "No result" );
+        if( responseCode == 200 ) {
+
+            try {
+
+                String result;
+
+                JSONObject jsonObject = new JSONObject( string );
+                JSONObject description = jsonObject.getJSONObject( "description" );
+                JSONArray tagsArray = description.getJSONArray( "tags" );
+                String tags = "Tags: " + tagsArray.getString( 0 );
+                for( int i = 1; i < tagsArray.length(); i++ ) {
+                    tags = tags + ", " + tagsArray.getString(i);
+                }
+                tags = tags + "\n\n";
+                JSONObject captionsArray = ( JSONObject )description.getJSONArray( "captions" ).get(0);
+                String captionText = captionsArray.getString( "text" );
+                String caption = "Caption: " + captionText + "\n\n";
+                Double captionConfidence = captionsArray.getDouble( "confidence" );
+                String confidence = "Confidence: " + String.valueOf( captionConfidence );
+
+                textView.setText( tags + caption + confidence );
+
+            }
+            catch ( JSONException e ) {
+                e.printStackTrace();
+                textView.setText( e.getMessage() );
+            }
+
+        }
+        else {
+
+            textView.setText( String.valueOf( responseCode ) + " " + string );
+
+        }
 
     }
 

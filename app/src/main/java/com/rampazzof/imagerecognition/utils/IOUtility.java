@@ -40,10 +40,6 @@ public class IOUtility {
 
         try( InputStream inputStream = new FileInputStream( file ) ) {
 
-            if ( ( float ) file.length() / ( 1024 * 1024 ) > 4 ) {
-                Log.d("Error:", "Maggiore di 4 MB" );
-            }
-
             getBytes = new byte[ ( int ) file.length() ];
             inputStream.read( getBytes );
 
